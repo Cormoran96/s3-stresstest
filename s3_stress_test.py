@@ -1,3 +1,27 @@
+#!/usr/bin/env python3
+
+"""
+s3 Stress Test
+
+This script uploads a specified number of objects to an S3 bucket, with each object being larger than the previous one
+by a specified ratio. The uploads are done in parallel using a ThreadPoolExecutor and the transfer rates of each
+upload are calculated and plotted.
+
+Usage:
+    s3_stress_test.py [-h] [-n NUM_OBJECTS] [-b BUCKET_NAME] [-r RATIO]
+
+Options:
+    -h, --help            show this help message and exit
+    -n NUM_OBJECTS, --num_objects NUM_OBJECTS
+                        Number of objects to upload (default: 50)
+    -b BUCKET_NAME, --bucket_name BUCKET_NAME
+                        Name of the S3 bucket (default: testnmg)
+    -r RATIO, --ratio RATIO
+                        Ratio by which the object size will be multiplied with each iteration (default: 2)
+"""
+# Author: Lucas Dousse
+# Created on: 2023-02-13
+
 import boto3
 import os
 import argparse
@@ -36,14 +60,23 @@ parser.add_argument('-b', '--bucket_name', type=str, default='testnmg', help='Na
 parser.add_argument('-r', '--ratio', type=int, default=2, help='Ratio by which the object size will be multiplied with each iteration')
 args = parser.parse_args()
 
+# Get the specified S3 bucket
 bucket = s3.Bucket(args.bucket_name)
 
-# Upload objects in parallel
+# Lists to store the sizes and upload times of the objects
 sizes = []
 times = []
-object_size = 1024 * 1024 * 5 # 5 MB
+
+# Initialize the object size to 5 MB
+object_size = 1024 * 1024 * 5 
+
+# Create a ThreadPoolExecutor with a maximum of 5 workers
 executor = ThreadPoolExecutor(max_workers=5)
+
+# List to store the futures for the uploaded objects
 futures = []
+
+# Upload the objects in parallel
 for i in range(args.num_objects):
     object_key = f'{object_prefix}{i}'
     data = generate_data(object_size)
@@ -51,7 +84,7 @@ for i in range(args.num_objects):
     sizes.append(object_size)
     object_size *= args.ratio
 
-# Wait for all the futures to complete
+# Wait for all the futures to complete and track the progress with tqdm
 for future, size in tqdm(zip(futures, sizes), total=args.num_objects, desc="Upload Progress"):
     size, duration = future.result()
     transfer_rate = size / (duration * 1024 * 1024)
